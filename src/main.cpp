@@ -17,7 +17,7 @@
 const uint16_t port = 7777;
 
 //Access point or client
-//#define WF_AP
+#define WF_AP
 
 // include the library
 #include <RadioLib.h>
@@ -29,8 +29,10 @@ const uint16_t port = 7777;
 // BUSY pin:  9
 //SX1262 radio1 = new Module(10, 2, 3, 9);
 
-float RX_freq = 262.225;
-float TX_freq = 262.225+33.6;
+float Freq_error = 0.001803;
+float RX_freq = 262.225 + Freq_error; 
+float TX_freq = 262.225+33.6 + Freq_error;
+
 
 SX1262 radio = new Module(5, 21, 33, 26);
 
@@ -150,7 +152,7 @@ void setup() {
   if (state == RADIOLIB_ERR_NONE) {
     Serial.println(F("success!"));
   } else {
-    Serial.print(F("failed, code "));
+    Serial.print(F("Init failed, code "));
     Serial.println(state);
     while (true);
   }
@@ -184,8 +186,9 @@ void loop() {
         Serial.println(F("transmission finished!"));        
 
       } else {
-        Serial.print(F("failed, code "));
+        Serial.print(F("TX failed, code "));
         Serial.println(transmissionState);
+        udp.broadcastTo("TX failed", port);
 
       }
       //radio.finishTransmit();
@@ -222,11 +225,12 @@ void loop() {
         Serial.print(radio.getSNR());
         Serial.println(F(" dB"));
         //send UDP
-        udp.broadcast(str.c_str());
+        udp.broadcastTo(str.c_str(), port);
       }    
       else {
-        Serial.print(F("failed, code "));
-        Serial.println(state);    
+        Serial.print(F("RX failed, code "));
+        Serial.println(state);
+        udp.broadcastTo("RX failed", port);
       }     
     }
     // wait before transmitting again
