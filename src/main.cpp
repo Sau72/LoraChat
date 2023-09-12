@@ -8,9 +8,7 @@
 
 #include <Arduino.h>
 #include <WiFi.h>
-#include <AsyncTCP.h>
-#include <ESPAsyncWebServer.h>
-#include <WebSerial.h>
+#include "AsyncUDP.h"
 
 
 #define LED 2
