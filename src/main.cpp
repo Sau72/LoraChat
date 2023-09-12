@@ -8,13 +8,13 @@
 
 #include <Arduino.h>
 #include <WiFi.h>
-#include "AsyncUDP.h"
+#include <ESPTelnet.h>
 
 
 #define LED 2
 
-//UDP port
-const uint16_t port = 7777;
+//telnet port
+const uint16_t port = 23;
 
 //Access point or client
 #define WF_AP
@@ -36,7 +36,8 @@ float TX_freq = 262.225+33.6 + Freq_error;
 
 SX1262 radio = new Module(5, 21, 33, 26);
 
-AsyncUDP udp;
+ESPTelnet telnet;
+IPAddress ip;
 
 #ifdef WF_AP
   const char* ssid = "LoraSat";          // Your WiFi SSID
@@ -77,37 +78,63 @@ void transmit(String &data){
   transmitFlag = true;
 }
 
-void parsePacket(AsyncUDPPacket packet)
-{
 
-  Serial.print("UDP Packet From: ");
-  Serial.print(packet.remoteIP());
-  Serial.print(":");
-  Serial.print(packet.remotePort());
-  Serial.print(", Data: ");
-  Serial.write(packet.data(), packet.length());
-  Serial.println();
+void onTelnetConnect(String ip) {
+  Serial.print("- Telnet: ");
+  Serial.print(ip);
+  Serial.println(" connected");
+  
+  telnet.println("\nWelcome " + telnet.getIP());
+  telnet.println("(Use ^] + q  to disconnect.)");
+}
 
-  // https://stackoverflow.com/questions/58253174/saving-packet-data-to-string-with-asyncudp-on-esp32
-  // String  mensaje = (char*)(packet.data());
-  char* tmpStr = (char*) malloc(packet.length() + 1);
-  memcpy(tmpStr, packet.data(), packet.length());
-  tmpStr[packet.length()] = '\0'; // ensure null termination
-  String message = String(tmpStr);
-  free(tmpStr); // Strign(char*) creates a copy so we can delete our one
+void onTelnetDisconnect(String ip) {
+  Serial.print("- Telnet: ");
+  Serial.print(ip);
+  Serial.println(" disconnected");
+}
 
-  Serial.println(message);
-  if(message == "on"){
-    digitalWrite(2, HIGH);
-    packet.print("Received: on");
-    }
-  if(message == "off"){
-    digitalWrite(2, LOW);
-    packet.print("Received: off");
-    }
+void onTelnetReconnect(String ip) {
+  Serial.print("- Telnet: ");
+  Serial.print(ip);
+  Serial.println(" reconnected");
+}
 
-  //send to lora
-  transmit(message);
+void onTelnetConnectionAttempt(String ip) {
+  Serial.print("- Telnet: ");
+  Serial.print(ip);
+  Serial.println(" tried to connected");
+}
+
+void onTelnetInput(String str) {
+  // checks for a certain command
+  if (str == "ping") {
+    telnet.println("> pong");
+    Serial.println("- Telnet: pong");
+  // disconnect the client
+  } else if (str == "bye") {
+    telnet.println("> disconnecting you...");
+    telnet.disconnectClient();
+    } else {
+    //send to lora
+    transmit(str);
+   }
+  }
+
+void setupTelnet() {  
+  // passing on functions for various telnet events
+  telnet.onConnect(onTelnetConnect);
+  telnet.onConnectionAttempt(onTelnetConnectionAttempt);
+  telnet.onReconnect(onTelnetReconnect);
+  telnet.onDisconnect(onTelnetDisconnect);
+  telnet.onInputReceived(onTelnetInput);
+
+  Serial.print("- Telnet: ");
+  if (telnet.begin(port)) {
+    Serial.println("running");
+  } else {
+    Serial.println("error.");   
+  }
 }
 
 void setup() {
@@ -135,11 +162,7 @@ void setup() {
     Serial.println(WiFi.localIP());
   #endif
   
-  
-  if(udp.listen(port)) {
-        // При получении пакета вызываем callback функцию
-        udp.onPacket(parsePacket);
-    }
+  setupTelnet();
 
   // initialize SX1262 with default settings
   Serial.print(F("[SX1262] Initializing ... "));
@@ -172,7 +195,8 @@ void setup() {
   }
 }
 
-void loop() {  
+void loop() {
+  telnet.loop();  
 // check if the previous operation finished
   if(operationDone) {
     // reset flag
@@ -188,7 +212,7 @@ void loop() {
       } else {
         Serial.print(F("TX failed, code "));
         Serial.println(transmissionState);
-        udp.broadcastTo("TX failed", port);
+        telnet.println("TX failed");
 
       }
       //radio.finishTransmit();
@@ -224,13 +248,13 @@ void loop() {
         Serial.print(F("[SX1262] SNR:\t\t"));
         Serial.print(radio.getSNR());
         Serial.println(F(" dB"));
-        //send UDP
-        udp.broadcastTo(str.c_str(), port);
+        //send to client
+        telnet.println(str.c_str());
       }    
       else {
         Serial.print(F("RX failed, code "));
         Serial.println(state);
-        udp.broadcastTo("RX failed", port);
+        telnet.println("RX failed");
       }     
     }
     // wait before transmitting again
