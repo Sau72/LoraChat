@@ -17,7 +17,7 @@
 const uint16_t port = 23;
 
 //Access point or client
-#define WF_AP
+//#define WF_AP
 
 // include the library
 #include <RadioLib.h>
