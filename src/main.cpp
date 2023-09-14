@@ -10,19 +10,27 @@
 #include <BLEDevice.h>
 #include <BLEUtils.h>
 #include <BLEServer.h>
+#include <BLE2902.h>
 
 #define LED 2
 
-#define SERVICE_UUID        "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
-#define CHARACTERISTIC_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8"
+#define SERVICE_UUID         "074a6272-6972-4e0a-bec4-fc21bc0638bd"
+#define CHARACTERISTIC1_UUID "ebf8d607-c368-49a2-99e3-1e591dcc4472"
+#define CHARACTERISTIC2_UUID "b6aa8f7e-a045-4b5e-be3d-3d15a7b74661"
 
 BLEServer* pServer = NULL;
 BLECharacteristic* pCharacteristic = NULL;
+BLECharacteristic* pCharacteristic2 = NULL;
+BLEDescriptor *pDescr;
+BLE2902 *pBLE2902;
 
 String bt_rec;
 String bt_send;
+String bt_send2;
 bool deviceConnected = false;
 bool oldDeviceConnected = false;
+
+//uint16_t mtu = 128;
 
 // include the library
 #include <RadioLib.h>
@@ -117,22 +125,61 @@ void setup() {
   Serial.begin(115200);
   pinMode(LED, OUTPUT);
 
+  // Create the BLE Device
   BLEDevice::init("ESP32 Lora");
+   
+  // Create the BLE Server
   pServer = BLEDevice::createServer();
   pServer->setCallbacks(new MyServerCallbacks());
+   // Create the BLE Service
   BLEService *pService = pServer->createService(SERVICE_UUID);
-  pCharacteristic = pService->createCharacteristic(
-                                         CHARACTERISTIC_UUID,
-                                         BLECharacteristic::PROPERTY_READ |
-                                         BLECharacteristic::PROPERTY_WRITE
-                                       );
 
-  pCharacteristic->setCallbacks(new MyCallbacks());
-  pCharacteristic->setValue("Init.");
+  // Create a BLE Characteristic
+  pCharacteristic = pService->createCharacteristic(
+                      CHARACTERISTIC1_UUID,
+                      BLECharacteristic::PROPERTY_NOTIFY
+                    );                   
+
+  pCharacteristic2 = pService->createCharacteristic(
+                      CHARACTERISTIC2_UUID,
+                      BLECharacteristic::PROPERTY_READ   |
+                      BLECharacteristic::PROPERTY_WRITE  
+                    );  
+
+  // Create a BLE Descriptor
+  pDescr = new BLEDescriptor((uint16_t)0x2901);
+  pDescr->setValue("Data from Lora");
+  pCharacteristic->addDescriptor(pDescr);
+  
+  pBLE2902 = new BLE2902();
+  pBLE2902->setNotifications(true);
+  
+  // Add all Descriptors here
+  pCharacteristic->addDescriptor(pBLE2902);
+  pCharacteristic2->addDescriptor(new BLE2902());
+  
+  // After defining the desriptors, set the callback functions
+  pCharacteristic2->setCallbacks(new MyCallbacks());
+  //pCharacteristic2->setCallbacks(new CharacteristicCallBack());
+
+  //pCharacteristic->setValue("Init.");
+  // Start the service
   pService->start();
 
-  BLEAdvertising *pAdvertising = pServer->getAdvertising();
-  pAdvertising->start();
+  // Start advertising
+  BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
+  pAdvertising->addServiceUUID(SERVICE_UUID);
+  pAdvertising->setScanResponse(false);
+  pAdvertising->setMinPreferred(0x0);  // set value to 0x00 to not advertise this parameter
+  BLEDevice::startAdvertising();
+
+  
+  //BLEDevice::setMTU(mtu);
+
+  Serial.println("Waiting a client connection to notify...");
+
+//  BLEAdvertising *pAdvertising = pServer->getAdvertising();
+//  pAdvertising->start();
 
 
   // initialize SX1262 with default settings
@@ -169,8 +216,8 @@ void setup() {
 }
 
 void loop() {  
-  if (deviceConnected) {    
-    // check if the previous operation finished
+  if (deviceConnected) {        
+     // check if the previous operation finished
     if(operationDone) {
       // reset flag
       operationDone = false;
@@ -180,7 +227,8 @@ void loop() {
         // print the result
         if (transmissionState == RADIOLIB_ERR_NONE) {
           // packet was successfully sent
-          Serial.println(F("transmission finished!"));        
+          Serial.println(F("transmission finished!"));
+          bt_send = "TX finished";      
 
         } else {
           Serial.print(F("TX failed, code "));
@@ -222,7 +270,8 @@ void loop() {
           Serial.print(radio.getSNR());
           Serial.println(F(" dB"));
           //send to client
-          bt_send = str;
+          bt_send = "New message";
+          bt_send2 = str;
         }    
         else {
           Serial.print(F("RX failed, code "));
@@ -233,9 +282,12 @@ void loop() {
       //send BLE
       pCharacteristic->setValue(bt_send.c_str()); 
       pCharacteristic->notify();
+      delay(5);
+      pCharacteristic2->setValue(bt_send2.c_str()); 
+      pCharacteristic2->notify();
       delay(5); // bluetooth stack will go into congestion, if too many packets are sent.
       // wait before transmitting again
-        delay(500);     
+      delay(500);     
     }  
   }
   if (!deviceConnected && oldDeviceConnected) {
