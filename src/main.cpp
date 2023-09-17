@@ -237,7 +237,7 @@ void loop() {
 
         }
         //radio.finishTransmit();
-        //turn LED off
+        //turn LED off (need check)
         digitalWrite(2, LOW);   // turn the LED off by making the voltage LOW        
         radio.setFrequency(RX_freq);
         
