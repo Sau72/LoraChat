@@ -11,6 +11,7 @@
 #include <BLEUtils.h>
 #include <BLEServer.h>
 #include <BLE2902.h>
+#include <config.h>
 
 #define LED 2
 
@@ -30,24 +31,11 @@ String bt_send2;
 bool deviceConnected = false;
 bool oldDeviceConnected = false;
 
-//uint16_t mtu = 128;
 
 // include the library
 #include <RadioLib.h>
 
-// SX1262 has the following connections:
-// NSS pin:   10
-// DIO1 pin:  2
-// NRST pin:  3
-// BUSY pin:  9
-//SX1262 radio1 = new Module(10, 2, 3, 9);
-
-float Freq_error = 0.001803;
-float RX_freq = 262.225 + Freq_error; 
-float TX_freq = 262.225+33.6 + Freq_error;
-
-
-SX1262 radio = new Module(5, 21, 33, 26);
+SX1262 radio = new Module(NSS, DIO1, NRST, BUSY);
 
 // save transmission states between loops
 int transmissionState = RADIOLIB_ERR_NONE;
@@ -185,11 +173,8 @@ void setup() {
   // initialize SX1262 with default settings
   Serial.print(F("[SX1262] Initializing ... "));
 
-  //7.81 , 10.42 , 15.63, 20.83 
-  //20.83
-  //int state = radio.begin(262.225+33.6, 15.63, 9, 5, 0x34, 22, 8, 0); // works
-  //int state = radio.begin(262.226+33.6, 20.83, 9, 5, 0x34, 22, 8, 0); // works
-  int state = radio.begin(RX_freq, 20.83, 9, 5, 0x34, 22, 8, 0); // works
+
+  int state = radio.begin(RX_freq, BW, 9, 5, SYNC, 22, 8, 0); // works
   //radio.setTCXO(3.3, 1563);
   
   if (state == RADIOLIB_ERR_NONE) {
