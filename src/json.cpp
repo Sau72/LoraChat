@@ -23,16 +23,16 @@ String PrintChannel(int channel, JsonDocument base)
 String ListChannel(JsonDocument base)
 {
     String conf;
-    for (int i = 1; base.size(); i++) {
+    for (int i = 0; i < base.size(); i++) {
 
-    JsonObject obj = base[i - 1];
+    JsonObject obj = base[i];
     float tfreq = obj["freq"];
     float tOffset = obj["of"];
     int tSF = obj["sf"];
     float tBW = obj["bw"];
 
-    conf += "Channel : ";
-    conf += String(i) + " ";
+    conf += "Ch : ";
+    conf += String(i+1) + " ";
     conf += "@rx = " + String(tfreq, 3) + " ";
     conf += "@of = " + String(tOffset, 3) + " ";
     conf += "@bw = " + String(tBW) + " ";   

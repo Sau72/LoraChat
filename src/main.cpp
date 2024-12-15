@@ -132,7 +132,6 @@ class MyCallbacks : public BLECharacteristicCallbacks
       Serial.print("BLE Received = ");
       Serial.println(bt_rec);
 
-      Serial.println(bt_rec.substring(0, 3));
       if (bt_rec.substring(0, 5) == "@help")
       {
         String welcome = "Use the following commands to modem:\n";
@@ -224,6 +223,11 @@ class MyCallbacks : public BLECharacteristicCallbacks
         transmit(bt_rec);
         spankTime = millis();
       }
+      else if (bt_rec.substring(0, 5) == "@list")
+     {
+       String conf = ListChannel(ChannelJson);
+       sendBLE("New message", conf);
+     }
       else
       {
         transmit(bt_rec);
